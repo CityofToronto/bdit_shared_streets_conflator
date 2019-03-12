@@ -30,6 +30,8 @@ Convert geographic layers in Postgresql to SharedStreets references
      - [Centreline](#centreline)
     
      - [Bluetooth](#bluetooth)
+     
+        - [Highway](#problems-with-matching-highways)
     
 ## What is SharedStreets
 SharedStreets is a linear referencing systems that allows the identification of different street segments to be linked to the same street.
@@ -164,12 +166,17 @@ Initial failure of uploading Bluetooth segments to SharedStreets with a returnin
 ##### Suggested Parameter:
 
 `lengthTolerance`= 0.5
+
 `planet`= 181029
+
 `ignoreDirection`= false
+
 `bearingTolerance` = 50
+
 `searchRadius` = 50
 
-#### Problem of Matching Highway
+
+#### Problems with Matching Highways
 
 However, some parts of Bluetooth highway segments have a really low matching rate, due to the distinctive difference of how OSM draws highway and how centreline is drawn. This problem is more apparent where Lakeshore and Gardiner overlap each other. The difference in geometry is too big for SharedStreets to match them correctly. Thus, it is not recommended to match Bluetooth highway segments to SharedStreets. (or any spatial datasets that differs too much from OSM)
 
