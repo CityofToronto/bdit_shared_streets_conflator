@@ -22,6 +22,8 @@ Convert geographic layers in Postgresql to SharedStreets references
      - [Gaps in intersections](#gaps-in-intersections)
    
      - [Problems with SnapToIntersection](#problems-with-snaptointersection)
+     
+     - [Extra Segments being matched](#extra-segments-being-matched)
 
 4.  [More on quirks with particular datasets](#more-on-quirks-with-particular-datasets)
 
@@ -146,6 +148,12 @@ Gaps appeared at some intersections such as the example below from a section of 
 Using `snapToIntersection` might eliminate gaps in intersections, but it also messes up the `section` attribute. The `section` attribute is crucial in validating how well SharedStreets API matched with our dataset by comparing the length of the matched segments with the length of our original data. The following example generated from [Getting started with SharedStreets](https://beta.observablehq.com/@kpwebb/sharedstreets-api) shows the difference of returned attributes of two different `snapToIntersection` setting from the matched segments. When `snaptoIntersection` is set as `TRUE`, the start location changed to 0 and the end location changed to the total length of the SharedStreets reference street length. This also resulted in multiple different segments matched as one sharedstreet segment as they now all have the same `section` attribute. 
 
 ![](screenshots/snaptointersection_3.PNG)
+
+#### Extra segments being matched
+
+Due to the difference of geometry between OSM and some spatial datasets (e.g. HERE links), some segments might be matched. On this example of a SharedStreets returned HERE segment on College between Bathurst and Dovercourt, Bathurst on Open Street Map is located to the right of where HERE links' Bathurst street was drawn. This resulted in an extra HERE link being matched to the Dovercourt to Bathurst Bluetooth segment instead of the Bathurst to University segment.
+
+![ss_problen1](https://user-images.githubusercontent.com/46324452/53778862-4138c200-3ecc-11e9-8e59-713ed80cf30e.PNG)
 
 ## More on quirks with particular datasets
 
