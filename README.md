@@ -159,5 +159,26 @@ Using `snapToIntersection` might eliminate gaps in intersections, but it also me
 
 ### Bluetooth
 
-Failed to upload Bluetooth segments, sections of Bluetooth segments, and non-overlapping Bluetooth segments to SharedStreet API. The returning error is `505 time out`. Since Bluetooth is drawn by centreline, centreline was used instead of Bluetooth segments. A reference table of bluetooth and corresponding centreline was then created for linking matched sharedstreets id back to blueooth segments.
+Initial failure of uploading Bluetooth segments to SharedStreets with a returning error of `505 time out`. After several trials of parameter tuning, this following parameter was able to send Bluetooth segments to SharedStreets with an acceptable match rate.
+
+##### Suggested Parameter:
+
+`lengthTolerance`= 0.5
+`planet`= 181029
+`ignoreDirection`= false
+`bearingTolerance` = 50
+`searchRadius` = 50
+
+#### Problem of Matching Highway
+
+However, some parts of Bluetooth highway segments have a really low matching rate, due to the distinctive difference of how OSM draws highway and how centreline is drawn. This problem is more apparent where Lakeshore and Gardiner overlap each other. The difference in geometry is too big for SharedStreets to match them correctly. Thus, it is not recommended to match Bluetooth highway segments to SharedStreets. (or any spatial datasets that differs too much from OSM)
+
+Example 1:
+
+![highway_what1](https://user-images.githubusercontent.com/46324452/54237636-c9325380-44ec-11e9-9d5f-cc23e3154b3f.PNG)
+
+Example 2:
+
+![bluetooth_what2](https://user-images.githubusercontent.com/46324452/54237633-c6cff980-44ec-11e9-8f90-b8b8130ae5c4.PNG)
+
 
