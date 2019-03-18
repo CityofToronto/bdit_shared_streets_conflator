@@ -105,7 +105,7 @@ SELECT x.* , (properties #>>'{originalFeature,properties,unique_og_id}')::int un
 ## General Challenges
 
 #### Problems with medians 
-Streets that are drawn differently in Open Street Map, such as streets with medians, are not being matched in SharedStreets API.
+Streets that are drawn differently in Open Street Map, such as streets with medians, are not being matched in SharedStreets API. For streets with medians, it can be returned as "matched" when only half of the direction of the street are actually matched. 
 
 York Street between Front Street West and Bremner Boulevard is represented in one line in centreline but two lines in open street map.
 
