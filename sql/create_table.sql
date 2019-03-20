@@ -1,0 +1,1 @@
+CREATE gis_shared_streets.new_layer (LIKE gis_shared_streets.platonic_ideal_table)
