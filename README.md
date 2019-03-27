@@ -3,15 +3,15 @@ Convert geographic layers in Postgresql to SharedStreets references
 
 ## Table of Contents
 
-1. [What is SharedStreets](#what-is-sharedstreets)
+1. [What is SharedStreets?](#what-is-sharedstreets)
 
-2. [How to conflate data with SharedStreets](#how-to-conflate-data-with-sharedstreets)
+2. [How to conflate data with SharedStreets?](#how-to-conflate-data-with-sharedstreets)
     
    - [Parameter tuning](#parameter-tuning)
     
    - [Data format returned from the API](#data-format-returned-from-the-api)
     
-   - [How to get data into the database](#how-to-get-data-into-the-database)
+   - [How to conflate data](#how-to-conflate-data)
    
 3.  [General Challenges](#general-challenges)
 
@@ -23,7 +23,7 @@ Convert geographic layers in Postgresql to SharedStreets references
    
      - [Problems with SnapToIntersection](#problems-with-snaptointersection)
      
-     - [Extra Segments being matched](#extra-segments-being-matched)
+     - [Intersection offset](#intersection-offset)
 
 4.  [More on quirks with particular datasets](#more-on-quirks-with-particular-datasets)
 
@@ -43,17 +43,19 @@ See [SharedStreets' website](https://sharedstreets.io/) for more detail.
 <sup>Source: SharedStreets Github
 ## How to conflate data with SharedStreets
 
-For more details on how to conflate data with SharedStreets on Observable, see this [How to conflate data with Sharedstreets](https://beta.observablehq.com/@chmnata/how-to-conflate-data-with-sharedstreets) notebook.
-
 ### Parameter tuning 
 
-**Parameter**|**Description**|**Options**
-:-----:|:-----:|:-----:
-Bearing Tolerance|Degrees tolerance to allow for directional street queries| 0-360 degrees
-Search Radius|Search radius in meters for snapping streets to SharedStreets references| 1-100 meters
-Length Tolerance|Line length for potential matches specified as a percent of total line length|0-100%
-Ignore line direction|Option to include directional information| `TRUE` / `FALSE`
-Snap to Intersection|Snap to complete street segments at nearby intersections that is within the search radius| `TRUE` / `FALSE`
+| Parameter | Description | Options |
+|-------------------------|---------------------------------------------------------------------------------------------|---------------|
+| Bearing   Tolerance | Degrees tolerance   to allow for directional street queries | 0-360 degrees |
+| Search   Radius | Search radius in   meters for snapping streets to SharedStreets references | 1-100 meters |
+| Length   Tolerance | Line length for   potential matches specified as a percent of total line length | 0-100% |
+| Ignore   line direction | Option to include   directional information | TRUE / FALSE |
+| Snap   to Intersection | Snap to complete   street segments at nearby intersections that is within the search radius | TRUE / FALSE |
+| Tile   Hierarchy* | Define which subclasses of road class will be use for matching | 6 |
+| Planet* | The version of OSM data SharedStreets API will use for matching | 180430 |
+
+*Changing `tileHierarchy` and `planet` will result in a different set of reference_id
 
 Use [Getting started with SharedStreets](https://beta.observablehq.com/@kpwebb/sharedstreets-api) to explore how parameter tuning affects matching results.
 
@@ -70,38 +72,40 @@ geometryId|ID for geometry of SharedStreets reference street regardless of lengt
 referenceLength|The total length of the sharedstreets referencing street matched|137.71
 sections|The section of the sharedstreets referencing street that matched to the uploaded street geometry|[90, 137.71]
 side|Side of street|left
-score|(to be filled in)|1.264
+score|General matching score|1.264
 originalFeature|Original attributes of the uploaded file|analysis_id
 geometry|The geometry type and the coordinates of the start and end point of a line string|Linestring, [-79.4455095, 43.7546433], [-79.459156, 43.754648]
 
-### How to get data into the database
+### How to conflate data
 
-1) Create a table in PostgreSQL with a column with JSON as data type
-2) Prepare JSON for importing
-    - Delete all space in between codes
-3) Import JSON to table using the following parameters:
-    - Format: text
-    - Delimiter: [tab]
-4) Query to extract and seperate columns from JSON
-```sql
-with inner_json as(
-select json_array_elements("referenceId"#>'{results}'->0->'features')->'properties' as properties
-from schema.table
-)            
-SELECT x.* , (properties #>>'{originalFeature,properties,unique_og_id}')::int unique_og_id
-        FROM inner_json
-        cross join lateral json_to_record(properties) 
-        as x( "referenceId" text,
-                "fromIntersectionId" text,
-                "toIntersectionId" text,
-                "roadClass" text,
-                "direction" text,
-                "geometryId" text,
-                "referenceLength" numeric,
-                "section" json,
-                side text,
-                score numeric)
+1) Create an output table in PostgreSQL using `gis_shared_streets.output_table_structure`
+
+2) Create a query info table in PostgreSQL using `gis_shared_streets.query_info_table`
+
+3) Make sure your data:
+    - Only include streets (filtered before conflating)
+    - Have a primary key of one or two columns
+    - If a street is bi-directional then there should be one geometry for each direction
+    
+4) Run this function in conflator.ipynb:
+```ruby
+matching(search_radius, length_tolerance, bearing_tolerance, previously_unmatched_id, input_table, output_table, query_info_table, primary_key1, primary_key2, con)
 ```
+| Variables               | Description                                                                                                                                                          | Example                                          |
+|-------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------|
+| search_radius           | Search radius in meters for snapping streets to SharedStreets references                                                                                             | 35                                               |
+| length_tolerance        | Line length for potential matches specified as a percent of total line   length                                                                                      | 0.5                                              |
+| bearing_tolerance       | Degrees tolerance to allow for directional street queries                                                                                                            | 35                                               |
+| previously_unmatched_id | list of IDs that were unmatched with previous calls to this function. If this is the first time calling the function on a dataset, then the value   should be None | None                                             |
+| input_table             | name of table with geometry that you would like to match to shared   streets                                                                                         | `gis.centreline_one_way`                         |
+| output_table            | name of table that the matched rows will be inserted into                                                                                                            | `gis_shared_streets.centreline_both_way_test`    |
+| query_info_table        | name of the table that records the general information each time we run   the function                                                                               | `gis_shared_streets.centreline_query_info_table` |
+| primary_key1            | the primary key of the input table                                                                                                                                   | `geo_id`                                         |
+| primary_key2            | the second primary key of the input table (e.g. if primary_key1 is not   the unique identifier for the table)                                                        | `direction`                                      |
+| con                     | database connection credentials                                                                                                                                      |                    -                              |
+
+
+
 ## General Challenges
 
 #### Problems with medians 
@@ -126,7 +130,7 @@ On this example section of University Avenue, after tuning the `bearingTolerance
 Some sidewalks and residential streets are being matched up in SharedStreets. 
 On this example section of Adelaide Street from York to Yonge (one way), the sidewalk was also getting matched adjacent to the actual street, with an attribute of `roadType`: Other, and `score` >5 
 
-![](screenshots/sidewalk.PNG)
+![](screenshots/sidewalks.PNG)
 
 **Use `tileHierarchy=6` instead of `tileHierarchy=8` eliminates sidewalks and some residential streets being matched.**
 (*Point to note: using different `tileHierarchy` will result in different referenceId for the same street*)
@@ -149,9 +153,9 @@ Using `snapToIntersection` might eliminate gaps in intersections, but it also me
 
 ![](screenshots/snaptointersection_3.PNG)
 
-#### Extra segments being matched
+#### Intersection Offset
 
-Due to the difference of geometry between OSM and some spatial datasets (e.g. HERE links), some segments might be matched. On this example of a SharedStreets returned HERE segment on College between Bathurst and Dovercourt, Bathurst on Open Street Map is located to the right of where HERE links' Bathurst street was drawn. This resulted in an extra HERE link being matched to the Dovercourt to Bathurst Bluetooth segment instead of the Bathurst to University segment.
+Due to the difference of geometry between OSM and some spatial datasets (e.g. HERE links), some segments might be matched incorrectly. On this example of a SharedStreets returned HERE segment on College between Bathurst and Dovercourt, Bathurst on Open Street Map is located to the right of where HERE links' Bathurst street was drawn. This resulted in an extra HERE link being matched to the Dovercourt to Bathurst Bluetooth segment instead of the Bathurst to University segment.
 
 ![ss_problen1](https://user-images.githubusercontent.com/46324452/53778862-4138c200-3ecc-11e9-8e59-713ed80cf30e.PNG)
 
@@ -164,7 +168,40 @@ Due to the difference of geometry between OSM and some spatial datasets (e.g. HE
 
 ### Centreline
 
-(to be filled in)
+Some of the issues we have encountered while wokring with centreline are [problems with medians](#problems-with-medians), [intersection offset](#intersection-offset)[(#12)](issues/12) as well as some matched value returned without attributes [(#11)](issues/11). 
+Since streets in the centreline layer do not contain directional information, we extracted `gis.centreline_one_way` from the Open Data Catalogue to create a layer (`gis_shared_streets.centreline_both_dir`) where there are one line for each direction using the following query:
+```sql
+create table gis_shared_streets.centreline_both_dir as (with temp as (select geo_id, fcode_desc, case when one_way_di = '-1' then ST_reverse(geom) else geom end as dir_geom
+from gis.centreline_one_way
+where one_way_di = '-1' or one_way_di = '1'
+
+union all
+
+select geo_id,fcode_desc,  case when one_way_di = '0' then ST_reverse(geom) end as dir_geom
+from gis.centreline_one_way
+where one_way_di = '0'
+
+union all
+
+select geo_id, fcode_desc, geom as dir_geom
+from gis.centreline_one_way
+where one_way_di = '0')
+
+, tempa2 as (select geo_id, fcode_desc, gis.direction_from_line(dir_geom)as direction, dir_geom
+from temp
+order by geo_id)
+
+select geo_id, fcode_desc, 'direction' || (row_number() over (partition by geo_id order by geo_id))::text as direction , dir_geom
+from tempa2
+where direction is null
+
+union all
+
+select geo_id, fcode_desc, direction, dir_geom
+from tempa2
+where direction is not null)
+```
+Unmatched rate decreased from 3.2% to 1.3% when `gis_shared_streets.centreline_both_dir` was used instead of `gis.centreline`. 
 
 
 ### Bluetooth
@@ -184,7 +221,7 @@ Initial failure of uploading Bluetooth segments to SharedStreets with a returnin
 `searchRadius` = 50
 
 
-#### Problems with Matching Highways
+#### Problems with Matching Bluetooth Highways
 
 However, some parts of Bluetooth highway segments have a really low matching rate, due to the distinctive difference of how OSM draws highway and how centreline is drawn. This problem is more apparent where Lakeshore and Gardiner overlap each other. The difference in geometry is too big for SharedStreets to match them correctly. Thus, it is not recommended to match Bluetooth highway segments to SharedStreets. (or any spatial datasets that differs too much from OSM)
 
