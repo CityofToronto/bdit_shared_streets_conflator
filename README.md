@@ -123,7 +123,7 @@ On this example section of University Avenue, after tuning the `bearingTolerance
 
 ![](screenshots/centreline_4.PNG)
 
-**Lowering the `bearingTolerance`appears to match up a lot of missing segments (e.g. `bearingTolerance=50` instead of `bearingTolerance=90`)**
+**However lowering the `bearingTolerance`appears to match up more segments in total (e.g. `bearingTolerance=50` instead of `bearingTolerance=90`)**
 
 #### Matching up sidewalks
 
@@ -201,7 +201,7 @@ select geo_id, fcode_desc, direction, dir_geom
 from tempa2
 where direction is not null)
 ```
-Unmatched rate decreased from 3.2% to 1.3% when `gis_shared_streets.centreline_both_dir` was used instead of `gis.centreline`. 
+Unmatched rate decreased from 3.2% to 1.3% when `gis_shared_streets.centreline_both_dir` was used instead of `gis.centreline`. Most unmatched streets are local streets (when using `tilehierarchy=6`).
 
 
 ### Bluetooth
@@ -229,8 +229,5 @@ Example 1:
 
 ![highway_what1](https://user-images.githubusercontent.com/46324452/54237636-c9325380-44ec-11e9-9d5f-cc23e3154b3f.PNG)
 
-Example 2:
-
-![bluetooth_what2](https://user-images.githubusercontent.com/46324452/54237633-c6cff980-44ec-11e9-8f90-b8b8130ae5c4.PNG)
 
 
