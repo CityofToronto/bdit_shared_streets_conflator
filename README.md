@@ -20,8 +20,6 @@ Convert geographic layers in Postgresql to SharedStreets references
      - [Matching up sidewalks](#matching-up-sidewalks)
    
      - [Gaps in intersections](#gaps-in-intersections)
-   
-     - [Problems with SnapToIntersection](#problems-with-snaptointersection)
      
      - [Intersection offset](#intersection-offset)
 
@@ -51,9 +49,9 @@ See [SharedStreets' website](https://sharedstreets.io/) for more detail.
 | Search   Radius | Search radius in   meters for snapping streets to SharedStreets references | 1-100 meters |
 | Length   Tolerance | Line length for   potential matches specified as a percent of total line length | 0-100% |
 | Ignore   line direction | Option to include   directional information | TRUE / FALSE |
-| Snap   to Intersection | Snap to complete   street segments at nearby intersections that is within the search radius | TRUE / FALSE |
+| Snap   to Intersection | Snap to nearby intersections, if they are within the search radius, in order to cover the complete street segment when possible | TRUE / FALSE |
 | Tile   Hierarchy* | Define which subclasses of road class will be use for matching | 6 |
-| Planet* | The version of OSM data SharedStreets API will use for matching | 180430 |
+| Planet* | The version of OSM data that the SharedStreets API will use for matching. These are updated roughly each month, using planetOSM. The 6 digits refer to year, month, and day | 180430 |
 
 *Changing `tileHierarchy` and `planet` will result in a different set of reference_id
 
@@ -67,12 +65,12 @@ referenceId|Unique segment identifier representing a route between two point loc
 fromIntersectionId|Interesection Id for the start point of each sharedstreets reference |66dc481c2f25c91f61a40d3cf5f536bc
 toIntersectionId|Interesection Id for the end point of each sharedstreets reference|108588a1eb9725fcdd1d9deb8e361238
 roadClass|Road class reference derived from Open Street Map|Secondary
-direction|Direction of Sharedstreets reference street segments|forward
+direction|Direction of SharedStreets reference street segment, with the forward reference following the direction of the map geometry used to generate the references|forward
 geometryId|ID for geometry of SharedStreets reference street regardless of length snapped|9a2dc5c132b317150646509c1368f2a4
 referenceLength|The total length of the sharedstreets referencing street matched|137.71
-sections|The section of the sharedstreets referencing street that matched to the uploaded street geometry|[90, 137.71]
-side|Side of street|left
-score|General matching score|1.264
+sections|The section of the SharedStreets reference street that matched to the uploaded street geometry. This is expressed as the location (in meters) along the reference street where the start point and the end point of the geometry were matched.|[90, 137.71]
+side|Side of street relative to the direction of travel.|left
+score|Indicates how well the datasets matched, with lower scores indicating a closer match. |1.264
 originalFeature|Original attributes of the uploaded file|analysis_id
 geometry|The geometry type and the coordinates of the start and end point of a line string|Linestring, [-79.4455095, 43.7546433], [-79.459156, 43.754648]
 
@@ -95,7 +93,7 @@ matching(search_radius, length_tolerance, bearing_tolerance, previously_unmatche
 |-------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------|
 | search_radius           | Search radius in meters for snapping streets to SharedStreets references                                                                                             | 35                                               |
 | length_tolerance        | Line length for potential matches specified as a percent of total line   length                                                                                      | 0.5                                              |
-| bearing_tolerance       | Degrees tolerance to allow for directional street queries                                                                                                            | 35                                               |
+| bearing_tolerance       | Tolerance to allow for directional street queries                                                                                                            | 35                                               |
 | previously_unmatched_id | list of IDs that were unmatched with previous calls to this function. If this is the first time calling the function on a dataset, then the value   should be None | None                                             |
 | input_table             | name of table with geometry that you would like to match to shared   streets                                                                                         | `gis.centreline_one_way`                         |
 | output_table            | name of table that the matched rows will be inserted into                                                                                                            | `gis_shared_streets.centreline_both_way_test`    |
@@ -123,11 +121,11 @@ On this example section of University Avenue, after tuning the `bearingTolerance
 
 ![](screenshots/centreline_4.PNG)
 
-**Lowering the `bearingTolerance`appears to match up a lot of missing segments (e.g. `bearingTolerance=50` instead of `bearingTolerance=90`)**
+**However lowering the `bearingTolerance`appears to match up more segments in total (e.g. `bearingTolerance=50` instead of `bearingTolerance=90`)**
 
 #### Matching up sidewalks
 
-Some sidewalks and residential streets are being matched up in SharedStreets. 
+Some sidewalks and residential streets are being matched up in SharedStreets using `tilehierarchy=8`. 
 On this example section of Adelaide Street from York to Yonge (one way), the sidewalk was also getting matched adjacent to the actual street, with an attribute of `roadType`: Other, and `score` >5 
 
 ![](screenshots/sidewalks.PNG)
@@ -145,13 +143,6 @@ Gaps appeared at some intersections such as the example below from a section of 
 
 ![](screenshots/snaptointersection.PNG)
 
-(*Point to note: `snapToIntersections=TRUE` will resulted in messy `section` attribute. For more details, check [Problem with snaptoIntersection](#problem-with-snaptointersection)*)
-
-#### Problems with SnaptoIntersection  
-
-Using `snapToIntersection` might eliminate gaps in intersections, but it also messes up the `section` attribute. The `section` attribute is crucial in validating how well SharedStreets API matched with our dataset by comparing the length of the matched segments with the length of our original data. The following example generated from [Getting started with SharedStreets](https://beta.observablehq.com/@kpwebb/sharedstreets-api) shows the difference of returned attributes of two different `snapToIntersection` setting from the matched segments. When `snaptoIntersection` is set as `TRUE`, the start location changed to 0 and the end location changed to the total length of the SharedStreets reference street length. This also resulted in multiple different segments matched as one sharedstreet segment as they now all have the same `section` attribute. 
-
-![](screenshots/snaptointersection_3.PNG)
 
 #### Intersection Offset
 
@@ -168,7 +159,7 @@ Due to the difference of geometry between OSM and some spatial datasets (e.g. HE
 
 ### Centreline
 
-Some of the issues we have encountered while wokring with centreline are [problems with medians](#problems-with-medians), [intersection offset](#intersection-offset)[(#12)](issues/12) as well as some matched value returned without attributes [(#11)](issues/11). 
+Some of the issues we have encountered while working with centreline are [problems with medians](#problems-with-medians), [intersection offset](#intersection-offset)[(#12)](issues/12) as well as some matched value returned without attributes [(#11)](issues/11). 
 Since streets in the centreline layer do not contain directional information, we extracted `gis.centreline_one_way` from the Open Data Catalogue to create a layer (`gis_shared_streets.centreline_both_dir`) where there are one line for each direction using the following query:
 ```sql
 create table gis_shared_streets.centreline_both_dir as (with temp as (select geo_id, fcode_desc, case when one_way_di = '-1' then ST_reverse(geom) else geom end as dir_geom
@@ -201,7 +192,7 @@ select geo_id, fcode_desc, direction, dir_geom
 from tempa2
 where direction is not null)
 ```
-Unmatched rate decreased from 3.2% to 1.3% when `gis_shared_streets.centreline_both_dir` was used instead of `gis.centreline`. 
+Unmatched rate decreased from 3.2% to 1.3% when `gis_shared_streets.centreline_both_dir` was used instead of `gis.centreline`. Most unmatched streets are local streets (when using `tilehierarchy=6`).
 
 
 ### Bluetooth
@@ -216,9 +207,9 @@ Initial failure of uploading Bluetooth segments to SharedStreets with a returnin
 
 `ignoreDirection`= false
 
-`bearingTolerance` = 50
+`bearingTolerance` = 50 
 
-`searchRadius` = 50
+`searchRadius` = 25 (if `snaptointersections=true` is used)
 
 
 #### Problems with Matching Bluetooth Highways
@@ -229,8 +220,5 @@ Example 1:
 
 ![highway_what1](https://user-images.githubusercontent.com/46324452/54237636-c9325380-44ec-11e9-9d5f-cc23e3154b3f.PNG)
 
-Example 2:
-
-![bluetooth_what2](https://user-images.githubusercontent.com/46324452/54237633-c6cff980-44ec-11e9-8f90-b8b8130ae5c4.PNG)
 
 
