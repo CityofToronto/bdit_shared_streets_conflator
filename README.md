@@ -171,35 +171,17 @@ Due to the difference of geometry between OSM and some spatial datasets (e.g. HE
 Some of the issues we have encountered while wokring with centreline are [problems with medians](#problems-with-medians), [intersection offset](#intersection-offset)[(#12)](issues/12) as well as some matched value returned without attributes [(#11)](issues/11). 
 Since streets in the centreline layer do not contain directional information, we extracted `gis.centreline_one_way` from the Open Data Catalogue to create a layer (`gis_shared_streets.centreline_both_dir`) where there are one line for each direction using the following query:
 ```sql
-create table gis_shared_streets.centreline_both_dir as (with temp as (select geo_id, fcode_desc, case when one_way_di = '-1' then ST_reverse(geom) else geom end as dir_geom
+create table gis_shared_streets.centreline_both_dir as (
+select geo_id, geo_id || 'A' as geo_dir, fcode_desc, ST_reverse(geom) dir_geom
 from gis.centreline_one_way
-where one_way_di = '-1' or one_way_di = '1'
+where one_way_di = '-1' or one_way_di = '0'
 
 union all
 
-select geo_id,fcode_desc,  case when one_way_di = '0' then ST_reverse(geom) end as dir_geom
+select geo_id, geo_id || 'B' as geo_dir, fcode_desc,  geom as dir_geom
 from gis.centreline_one_way
-where one_way_di = '0'
+where one_way_di = '0' or one_way_dir = '1'
 
-union all
-
-select geo_id, fcode_desc, geom as dir_geom
-from gis.centreline_one_way
-where one_way_di = '0')
-
-, tempa2 as (select geo_id, fcode_desc, gis.direction_from_line(dir_geom)as direction, dir_geom
-from temp
-order by geo_id)
-
-select geo_id, fcode_desc, 'direction' || (row_number() over (partition by geo_id order by geo_id))::text as direction , dir_geom
-from tempa2
-where direction is null
-
-union all
-
-select geo_id, fcode_desc, direction, dir_geom
-from tempa2
-where direction is not null)
 ```
 Unmatched rate decreased from 3.2% to 1.3% when `gis_shared_streets.centreline_both_dir` was used instead of `gis.centreline`. Most unmatched streets are local streets (when using `tilehierarchy=6`).
 
